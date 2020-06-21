@@ -21,30 +21,23 @@ class LINE(nn.Module):
             self.context.weight.data = self.context.weight.data.uniform_(
                 -0.5, 0.5) / latent_dim
 
-    def forward(self, v_i, v_j, w_ij):
+    def forward(self, v_i, v_j, neg_samples):
         u_i = self.embedding(v_i)
 
         if self.order == 2:
             u_j = self.context(v_j)
-            # print(u_j)
-            # print(u_i)
-            # exit(0)
-            negative = torch.sum(torch.exp(torch.matmul(u_j, u_i.T)), dim=0)
-            # print(negative)
+            negative = -self.context(neg_samples)
         else:
             u_j = self.embedding(v_j)
+            negative = -self.embedding(neg_samples)
 
-        inner_product = torch.sum(torch.mul(u_i, u_j), dim=1)
-        # print(inner_product, torch.log(negative), inner_product - torch.log(negative))
-        # print(torch.log(negative))
+        # negative = torch.sum(torch.exp(torch.matmul(u_j, u_i.T)), dim=0)
 
-        if self.order == 2:
-            loss = w_ij * (inner_product - torch.log(negative))
-            # print(loss)
-        else:
-            loss = w_ij * F.logsigmoid(inner_product)
-        # loss = w_ij * F.logsigmoid(inner_product)
-        # print(loss)
-        # exit(0)
-        return -torch.mean(loss)
+        stage1 = F.logsigmoid(torch.sum(torch.mul(u_i, u_j), dim=1))
+
+        stage2 = torch.mul(u_i.view(len(u_i), 1, self.latent_dim), negative)
+
+        stage3 = torch.sum(F.logsigmoid(torch.sum(stage2, dim=2)), dim=1)
+
+        return -torch.mean(stage1 + stage3)
 
