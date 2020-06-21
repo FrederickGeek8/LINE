@@ -49,7 +49,7 @@ if __name__ == "__main__":
     for epoch in range(100):
         print(f"Epoch {epoch}")
         
-        negative_nodes = torch.LongTensor(node_sample(v_i, edges[:, 1], negative_sampling))
+        negative_nodes = torch.LongTensor(node_sample(v_i, v_j, negative_sampling))
 
         line.zero_grad()
         loss = line(v_i, v_j, negative_nodes)
