@@ -33,10 +33,9 @@ class AliasMethod:
             else:
                 large.append(i)
         
-
         while len(large) > 0 and len(small) > 0:
-            l = small.pop(0)
-            g = large.pop(0)
+            l = small.pop()
+            g = large.pop()
             self.prob[l] = self.scaled_p[l]
             self.alias[l] = g
 
@@ -47,20 +46,24 @@ class AliasMethod:
             else:
                 large.append(g)
         
+        
+
         while len(large) > 0:
-            self.prob[large.pop(0)] = 1
+            self.prob[large.pop()] = 1
 
         while len(small) > 0:
-            self.prob[small.pop(0)] = 1
+            self.prob[small.pop()] = 1
+
 
     def sample(self, n=1):
         i = np.random.randint(0, self.n, size=(n))
         dice = np.random.uniform(0, 1, size=(n))
-        filtered = np.where(self.prob[i] > dice, self.population[i], self.population[self.alias[i]])
+
+        filtered = np.where(self.prob[i] > dice, i, self.alias[i])
         if filtered.shape[0] == 1:
-            return filtered[0]
+            return self.population[filtered[0]]
         
-        return filtered
+        return self.population[filtered]
                 
 
 def node_sample(v_i, v_j, alias, size=5):

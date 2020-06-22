@@ -27,14 +27,11 @@ def context_encoding(matrix):
     return output
 
 def generate_dist(graph, power=0.75):
-    # neg_avg = 0
     nodes_prob = np.array(graph.out_degree(weight='weight'))[:, 1]
-    # nodes_prob = np.zeros((graph.number_of_nodes()))
-    # for start, end, weight in graph.edges(data='weight'):
-        # nodes_prob[start] += weight
-    
     nodes_prob = np.power(nodes_prob, power)
     nodes_prob = nodes_prob / np.sum(nodes_prob)
-    # print(nodes_prob)
 
-    return nodes_prob
+    edges = np.array(list(graph.edges(data='weight')))
+    edges[:, 2] = edges[:, 2] / np.sum(edges[:, 2])
+
+    return nodes_prob, edges

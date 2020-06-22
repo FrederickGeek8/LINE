@@ -1,73 +1,105 @@
 from line_module import LINE
 from sklearn.metrics.pairwise import cosine_similarity
 from math import log
+from torch.utils.tensorboard import SummaryWriter
+from sampling import AliasMethod, node_sample
+from bad import VoseAlias
+from utils import common_neighbors, context_encoding, generate_dist
 import torch
+import argparse
 import torch.optim as optim
 import numpy as np
 import networkx as nx
 import matplotlib.pyplot as plt
-from sampling import AliasMethod, node_sample
-from utils import common_neighbors, context_encoding, generate_dist
 
 if __name__ == "__main__":
-    block_size = 10
-    order = 1
-    
-    matrix = np.block([
-        [10 * np.ones((block_size,block_size)), np.zeros((block_size,block_size))],
-        [np.zeros((block_size, block_size)), 10 * np.ones((block_size, block_size))]
-    ])
+    power = 0.75
+    parser = argparse.ArgumentParser()
+    parser.add_argument("-block", "--block_size", type=int, default=100)
+    parser.add_argument("-order", "--order", type=int, default=1)
+    parser.add_argument("-batch", "--batch_size", type=int, default=5)
+    parser.add_argument("-epochs", "--epochs", type=int, default=10)
+    parser.add_argument("-lr", "--learning_rate", type=float, default=0.025)
+    parser.add_argument("-tb",
+                        "--tensorboard_path",
+                        type=str,
+                        default="./runs/")
+    args = parser.parse_args()
+
+    matrix = np.block([[
+        1 * np.ones((args.block_size, args.block_size)),
+        np.zeros((args.block_size, args.block_size))
+    ],
+    [
+        np.zeros((args.block_size, args.block_size)),
+        1 * np.ones((args.block_size, args.block_size))
+    ]])
 
     np.fill_diagonal(matrix, 0)
     graph = nx.from_numpy_matrix(matrix, create_using=nx.DiGraph())
 
-    edges = torch.LongTensor(list(graph.edges(data='weight')))
-    # print(graph.number_of_nodes())
-
-    v_i = edges[:, 0]
-    v_j = edges[:, 1]
-
-    if order == 2:
+    if args.order == 2:
         # print(edges.shape[0])
         tmp = []
         context = common_neighbors(graph)
         uni = np.array(context_encoding(context))
-        fin = uni[v_j]
-        # print(fin)
-        v_j = torch.LongTensor(fin)
 
-    line = LINE(graph.number_of_nodes(), latent_dim=2, order=order)
+    line = LINE(graph.number_of_nodes(), latent_dim=2, order=args.order)
 
-    opt = optim.SGD(line.parameters(), lr=0.25, momentum=0.9)
-
+    opt = optim.SGD(line.parameters(), lr=args.learning_rate, momentum=0.9)
 
     # Negative sampling
-    power = 0.75
-    nodes_prob = generate_dist(graph)
-    negative_sampling = AliasMethod(np.arange(0, graph.number_of_nodes()), nodes_prob)
+    nodes_prob, edges_prob = generate_dist(graph)
+    negative_sampling = AliasMethod(np.arange(0, graph.number_of_nodes()),
+                                    nodes_prob)
+    edge_selector = AliasMethod(edges_prob[:, :2], edges_prob[:, 2])
+    batch_range = edges_prob.shape[0] // args.batch_size
 
-    for epoch in range(100):
-        print(f"Epoch {epoch}")
-        
-        negative_nodes = torch.LongTensor(node_sample(v_i, v_j, negative_sampling))
+    writer = SummaryWriter(args.tensorboard_path)
 
-        line.zero_grad()
-        loss = line(v_i, v_j, negative_nodes)
-        loss.backward()
-
-        # print(list(line.parameters())[1])
-        
-        opt.step()
-        print(loss.item())
-    
     nodes = torch.LongTensor(list(graph.nodes()))
 
-    print(graph.nodes)
+    for epoch in range(args.epochs):
+        print(f"Epoch {epoch}")
+        for b in range(batch_range):
+            edges = torch.LongTensor(edge_selector.sample(args.batch_size))
+            v_i = edges[:, 0]
+            v_j = edges[:, 1]
+
+            if args.order == 2:
+                fin = uni[v_j]
+                v_j = torch.LongTensor(fin)
+
+            negative_nodes = torch.LongTensor(
+                node_sample(v_i, v_j, negative_sampling))
+
+            line.zero_grad()
+            loss = line(v_i, v_j, negative_nodes)
+            loss.backward()
+
+            # print(list(line.parameters())[1])
+
+            opt.step()
+
+            if b % (batch_range // 5) == 0:
+                print("Loss:", loss.item())
+                embedding = line.embedding(nodes).detach().numpy()
+                figure = plt.figure()
+                # print(embedding.shape)
+
+                plt.scatter(embedding[:, 0], embedding[:, 1], s=14)
+
+                writer.add_figure('images', figure, epoch * batch_range + b)
+                writer.add_scalar('loss', loss, epoch * batch_range + b)
+
+    writer.close()
+
+    # print(graph.nodes)
     # exit(0)
 
     embedding = line.embedding(nodes).detach().numpy()
-    print(embedding.shape)
+    # print(embedding.shape)
 
-    plt.scatter(embedding[:,0], embedding[:,1], s=14)
-    
+    plt.scatter(embedding[:, 0], embedding[:, 1], s=14)
+
     plt.show()
