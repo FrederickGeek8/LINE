@@ -22,8 +22,10 @@ if __name__ == "__main__":
     parser.add_argument("-tb",
                         "--tensorboard_path",
                         type=str,
-                        default="./runs/")
+                        default=None)
     args = parser.parse_args()
+
+    print(f"Using order {args.order}")
 
     matrix = np.block([[
         1 * np.ones((args.block_size, args.block_size)),
@@ -90,7 +92,7 @@ if __name__ == "__main__":
 
             if b % (batch_range // 5) == 0:
                 print("Loss:", loss.item())
-                embedding = model.embedding(nodes).detach().numpy()
+                embedding = model.embedding(nodes).cpu().detach().numpy()
                 figure = plt.figure()
                 # print(embedding.shape)
 
@@ -104,7 +106,7 @@ if __name__ == "__main__":
     # print(graph.nodes)
     # exit(0)
 
-    embedding = model.embedding(nodes).detach().numpy()
+    embedding = model.embedding(nodes).cpu().detach().numpy()
     # print(embedding.shape)
 
     plt.scatter(embedding[:, 0], embedding[:, 1], s=14)
