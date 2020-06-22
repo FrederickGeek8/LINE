@@ -3,7 +3,6 @@ from sklearn.metrics.pairwise import cosine_similarity
 from math import log
 from torch.utils.tensorboard import SummaryWriter
 from sampling import AliasMethod, node_sample
-from bad import VoseAlias
 from utils import common_neighbors, context_encoding, generate_dist
 import torch
 import argparse
@@ -44,9 +43,12 @@ if __name__ == "__main__":
         context = common_neighbors(graph)
         uni = np.array(context_encoding(context))
 
-    line = LINE(graph.number_of_nodes(), latent_dim=2, order=args.order)
+    model = LINE(graph.number_of_nodes(), latent_dim=2, order=args.order)
 
-    opt = optim.SGD(line.parameters(), lr=args.learning_rate, momentum=0.9)
+    if torch.cuda.is_available():
+        model = model.cuda()
+
+    opt = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
 
     # Negative sampling
     nodes_prob, edges_prob = generate_dist(graph)
@@ -72,18 +74,23 @@ if __name__ == "__main__":
 
             negative_nodes = torch.LongTensor(
                 node_sample(v_i, v_j, negative_sampling))
+            
+            if torch.cuda.is_available():
+                v_i = v_i.cuda()
+                v_j = v_j.cuda()
+                negative_nodes = negative_nodes.cuda()
 
-            line.zero_grad()
-            loss = line(v_i, v_j, negative_nodes)
+            model.zero_grad()
+            loss = model(v_i, v_j, negative_nodes)
             loss.backward()
 
-            # print(list(line.parameters())[1])
+            # print(list(model.parameters())[1])
 
             opt.step()
 
             if b % (batch_range // 5) == 0:
                 print("Loss:", loss.item())
-                embedding = line.embedding(nodes).detach().numpy()
+                embedding = model.embedding(nodes).detach().numpy()
                 figure = plt.figure()
                 # print(embedding.shape)
 
@@ -97,7 +104,7 @@ if __name__ == "__main__":
     # print(graph.nodes)
     # exit(0)
 
-    embedding = line.embedding(nodes).detach().numpy()
+    embedding = model.embedding(nodes).detach().numpy()
     # print(embedding.shape)
 
     plt.scatter(embedding[:, 0], embedding[:, 1], s=14)
