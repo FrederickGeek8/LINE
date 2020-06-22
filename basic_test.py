@@ -14,22 +14,33 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     power = 0.75
     parser = argparse.ArgumentParser()
-    parser.add_argument("-graph", "--graph_path", type=str)
     parser.add_argument("-block", "--block_size", type=int, default=100)
     parser.add_argument("-order", "--order", type=int, default=1)
     parser.add_argument("-batch", "--batch_size", type=int, default=5)
     parser.add_argument("-epochs", "--epochs", type=int, default=10)
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.025)
     parser.add_argument("-sam", "--node_sample_size", type=int, default=5)
-    parser.add_argument("-tb", "--tensorboard_path", type=str, default=None)
+    parser.add_argument("-tb",
+                        "--tensorboard_path",
+                        type=str,
+                        default=None)
     args = parser.parse_args()
 
     print(f"Using order {args.order}")
 
-    graph = nx.read_edgelist(args.graph_path, nodetype=int)
-    graph = nx.relabel.convert_node_labels_to_integers(graph)
+    matrix = np.block([[
+        1 * np.ones((args.block_size, args.block_size)),
+        np.zeros((args.block_size, args.block_size))
+    ],
+    [
+        np.zeros((args.block_size, args.block_size)),
+        1 * np.ones((args.block_size, args.block_size))
+    ]])
+
+    np.fill_diagonal(matrix, 0)
+    graph = nx.from_numpy_matrix(matrix)
     graph = graph.to_directed()
-    
+
     model = LINE(graph.number_of_nodes(), latent_dim=2, order=args.order)
 
     if torch.cuda.is_available():
@@ -54,13 +65,10 @@ if __name__ == "__main__":
             edges = torch.LongTensor(edge_selector.sample(args.batch_size))
             v_i = edges[:, 0]
             v_j = edges[:, 1]
-            
-            negative_nodes = torch.LongTensor(
-                node_sample(v_i,
-                            v_j,
-                            negative_sampling,
-                            size=args.node_sample_size))
 
+            negative_nodes = torch.LongTensor(
+                node_sample(v_i, v_j, negative_sampling, size=args.node_sample_size))
+            
             if torch.cuda.is_available():
                 v_i = v_i.cuda()
                 v_j = v_j.cuda()
@@ -76,9 +84,6 @@ if __name__ == "__main__":
 
             if b % (batch_range // 5) == 0:
                 print("Loss:", loss.item())
-                print(
-                    f"Done {(epoch * batch_range + b) / (args.epochs * batch_range)}"
-                )
                 embedding = model.embedding(nodes).cpu().detach().numpy()
                 figure = plt.figure()
                 # print(embedding.shape)

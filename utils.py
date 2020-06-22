@@ -11,6 +11,8 @@ def common_neighbors(graph):
 
 def context_encoding(matrix):
     unique = np.unique(matrix, return_index=True, axis=0)
+    # print(unique)
+    # exit(0)
     output = [0] * matrix.shape[1]
     count = 0
     for idx in unique[1]:
@@ -20,7 +22,7 @@ def context_encoding(matrix):
     u = set(unique[1])
     v = set(range(matrix.shape[1]))
     for i in v.difference(u):
-        for j in matrix:
+        for j in range(matrix.shape[1]):
             if np.array_equal(matrix[i], matrix[j]):
                 output[i] = output[j]
 
@@ -31,7 +33,7 @@ def generate_dist(graph, power=0.75):
     nodes_prob = np.power(nodes_prob, power)
     nodes_prob = nodes_prob / np.sum(nodes_prob)
 
-    edges = np.array(list(graph.edges(data='weight')))
+    edges = np.array(list(graph.edges(data='weight', default=1)))
     edges[:, 2] = edges[:, 2] / np.sum(edges[:, 2])
 
     return nodes_prob, edges
