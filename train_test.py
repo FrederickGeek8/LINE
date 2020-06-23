@@ -14,13 +14,13 @@ import matplotlib.pyplot as plt
 if __name__ == "__main__":
     power = 0.75
     parser = argparse.ArgumentParser()
-    parser.add_argument("-graph", "--graph_path", type=str)
-    parser.add_argument("-block", "--block_size", type=int, default=100)
+    parser.add_argument("-graph", "--graph_path", type=str, required=True)
     parser.add_argument("-order", "--order", type=int, default=1)
     parser.add_argument("-batch", "--batch_size", type=int, default=5)
     parser.add_argument("-epochs", "--epochs", type=int, default=10)
     parser.add_argument("-lr", "--learning_rate", type=float, default=0.025)
     parser.add_argument("-sam", "--node_sample_size", type=int, default=5)
+    parser.add_argument("-save", "--save_path", type=str, default=None)
     parser.add_argument("-tb", "--tensorboard_path", type=str, default=None)
     args = parser.parse_args()
 
@@ -31,9 +31,11 @@ if __name__ == "__main__":
     graph = graph.to_directed()
     
     model = LINE(graph.number_of_nodes(), latent_dim=2, order=args.order)
-
+    nodes = torch.LongTensor(list(graph.nodes()))
+    
     if torch.cuda.is_available():
         model = model.cuda()
+        nodes = nodes.cuda()
 
     opt = optim.SGD(model.parameters(), lr=args.learning_rate, momentum=0.9)
 
@@ -47,7 +49,7 @@ if __name__ == "__main__":
 
     writer = SummaryWriter(args.tensorboard_path)
 
-    nodes = torch.LongTensor(list(graph.nodes()))
+    
 
     for epoch in range(args.epochs):
         print(f"Epoch {epoch}")
@@ -94,9 +96,15 @@ if __name__ == "__main__":
     # print(graph.nodes)
     # exit(0)
 
-    embedding = model.embedding(nodes).cpu().detach().numpy()
-    # print(embedding.shape)
+    if (args.save_path is not None):
+        print(f"Saving model to {args.save_path}")
+        torch.save(model.state_dict(), f"{args.save_path}")
+    else:
+        embedding = model.embedding(nodes).cpu().detach().numpy()
+        # print(embedding.shape)
 
-    plt.scatter(embedding[:, 0], embedding[:, 1], s=14)
+        plt.scatter(embedding[:, 0], embedding[:, 1], s=14)
 
-    plt.show()
+        plt.show()
+
+    
