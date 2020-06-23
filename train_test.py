@@ -41,7 +41,8 @@ if __name__ == "__main__":
     nodes_prob, edges_prob = generate_dist(graph)
     negative_sampling = AliasMethod(np.arange(0, graph.number_of_nodes()),
                                     nodes_prob)
-    edge_selector = AliasMethod(edges_prob[:, :2], edges_prob[:, 2])
+    edge_selector = AliasMethod(edges_prob[:, :2].astype(int), edges_prob[:, 2])
+
     batch_range = edges_prob.shape[0] // args.batch_size
 
     writer = SummaryWriter(args.tensorboard_path)

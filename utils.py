@@ -33,7 +33,9 @@ def generate_dist(graph, power=0.75):
     nodes_prob = np.power(nodes_prob, power)
     nodes_prob = nodes_prob / np.sum(nodes_prob)
 
-    edges = np.array(list(graph.edges(data='weight', default=1)))
+    edges = np.array(list(graph.edges(data='weight', default=1.0)))
     edges[:, 2] = edges[:, 2] / np.sum(edges[:, 2])
+
+    # print(edges)
 
     return nodes_prob, edges
